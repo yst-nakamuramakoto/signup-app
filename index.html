@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>福祉用具サービス計画書 署名・同意ツール</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        :root {
+            --green-900: #004d3a;
+            --green-700: #00705a;
+            --green-500: #00896c;
+            --green-300: #5bbda4;
+            --green-100: #c8ede6;
+            --green-50:  #edf7f5;
+            --surface:   #ffffff;
+            --bg:        #f0f5f4;
+            --border:    #b2d4cd;
+            --text-primary: #1a2e2b;
+            --text-secondary: #4a6762;
+            --text-muted: #8aa09c;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --shadow-sm: 0 1px 4px rgba(0,89,70,0.08);
+            --shadow-md: 0 4px 16px rgba(0,89,70,0.12);
+            --shadow-lg: 0 8px 32px rgba(0,89,70,0.16);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            height: 100%;
+            font-family: 'Noto Sans JP', sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            -webkit-tap-highlight-color: transparent;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        /* ======= LAYOUT ======= */
+        .app-shell {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--surface);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* ======= HEADER ======= */
+        .app-header {
+            background: linear-gradient(135deg, var(--green-900) 0%, var(--green-700) 100%);
+            padding: 20px 24px 16px;
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .app-header h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            opacity: 0.95;
+        }
+        .app-header p {
+            font-size: 0.78rem;
+            opacity: 0.7;
+            margin-top: 3px;
+        }
+
+        /* ======= STEP TABS ======= */
+        .step-tabs {
+            display: flex;
+            background: var(--green-900);
+            border-bottom: 3px solid var(--green-500);
+        }
+        .step-tab {
+            flex: 1;
+            padding: 14px 8px;
+            text-align: center;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: rgba(255,255,255,0.5);
+            cursor: pointer;
+            transition: all 0.25s ease;
+            position: relative;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .step-tab .step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid currentColor;
+            font-size: 0.75rem;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .step-tab.active {
+            color: white;
+            background: rgba(255,255,255,0.1);
+        }
+        .step-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            left: 0; right: 0;
+            height: 3px;
+            background: var(--green-300);
+        }
+        .step-tab.done {
+            color: rgba(255,255,255,0.7);
+        }
+        .step-tab.done .step-num {
+            background: var(--green-500);
+            border-color: var(--green-500);
+        }
+
+        /* ======= CONTENT AREA ======= */
+        .content-area {
+            padding: 28px 24px;
+            flex: 1;
+        }
+        .section-panel { display: none; }
+        .section-panel.active { display: block; }
+
+        /* ======= UPLOAD AREA ======= */
+        .upload-zone {
+            border: 2.5px dashed var(--border);
+            border-radius: var(--radius-lg);
+            background: var(--green-50);
+            padding: 48px 24px;
+            text-align: center;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--green-500);
+            background: var(--green-100);
+        }
+        .upload-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            background: var(--green-100);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .upload-icon svg { width: 32px; height: 32px; fill: var(--green-500); }
+        .upload-zone h3 { font-size: 1rem; color: var(--text-primary); margin-bottom: 6px; }
+        .upload-zone p { font-size: 0.85rem; color: var(--text-secondary); }
+        .file-input-label {
+            display: inline-block;
+            margin-top: 16px;
+            padding: 12px 28px;
+            background: var(--green-500);
+            color: white;
+            border-radius: 100px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .file-input-label:hover { background: var(--green-700); }
+        #pdf-upload { display: none; }
+
+        .upload-success {
+            margin-top: 20px;
+            padding: 16px;
+            background: var(--green-50);
+            border: 1.5px solid var(--green-300);
+            border-radius: var(--radius-md);
+            display: none;
+            align-items: center;
+            gap: 12px;
+        }
+        .upload-success.visible { display: flex; }
+        .upload-success svg { width: 24px; height: 24px; fill: var(--green-500); flex-shrink: 0; }
+        .upload-success span { font-size: 0.9rem; color: var(--green-700); font-weight: 500; }
+
+        .btn-next {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            margin-top: 24px;
+            padding: 18px;
+            background: var(--green-500);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-md);
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        .btn-next.enabled {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .btn-next:active { transform: scale(0.98); }
+        .btn-next svg { width: 20px; height: 20px; fill: white; }
+
+        /* ======= AGREEMENT CHECKS ======= */
+        .card {
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-md);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .card-header {
+            background: var(--green-50);
+            border-bottom: 1.5px solid var(--border);
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--green-900);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-header svg { width: 16px; height: 16px; fill: var(--green-500); }
+        .card-body { padding: 16px; }
+
+        .check-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--green-50);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .check-item:last-child { border-bottom: none; padding-bottom: 0; }
+        .check-item:first-child { padding-top: 0; }
+
+        /* Custom checkbox */
+        .check-box {
+            width: 28px;
+            height: 28px;
+            border: 2.5px solid var(--border);
+            border-radius: 6px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            background: white;
+        }
+        .check-box svg { width: 16px; height: 16px; fill: white; opacity: 0; transition: opacity 0.15s; }
+        input[type=checkbox] { display: none; }
+        input[type=checkbox]:checked + .check-box {
+            background: var(--green-500);
+            border-color: var(--green-500);
+        }
+        input[type=checkbox]:checked + .check-box svg { opacity: 1; }
+        .check-label { font-size: 0.9rem; line-height: 1.6; color: var(--text-primary); padding-top: 3px; }
+
+        /* ======= DATE FIELDS ======= */
+        .date-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 10px;
+        }
+        .date-field { display: flex; flex-direction: column; }
+        .field-label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* ======= SIGNATURE CANVASES ======= */
+        .canvas-wrapper {
+            position: relative;
+            background: #fff;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            touch-action: none;
+        }
+        .canvas-wrapper.date-canvas {
+            height: 90px;
+        }
+        .canvas-wrapper.sig-canvas-wrap {
+            height: 180px;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+            touch-action: none;
+        }
+        .canvas-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .btn-clear-canvas {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 3px 10px;
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .btn-clear-canvas:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
+
+        .sig-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        /* ======= GENERATE BUTTON ======= */
+        .btn-generate {
+            width: 100%;
+            padding: 20px;
+            background: linear-gradient(135deg, var(--green-700), var(--green-500));
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1.05rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            box-shadow: var(--shadow-md);
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+        .btn-generate:active { transform: scale(0.98); }
+
+        /* ======= PREVIEW ======= */
+        .preview-section { display: none; }
+        .preview-section.visible { display: block; }
+
+        .pdf-scroll-area {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: auto;
+            background: #525659;
+            border-radius: var(--radius-md);
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            max-height: 65vh;
+        }
+        #preview-canvas {
+            display: block;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+            max-width: 100%;
+        }
+
+        .btn-download {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            margin-top: 16px;
+            padding: 20px;
+            background: var(--green-700);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1.05rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            box-shadow: var(--shadow-md);
+            transition: all 0.2s;
+        }
+        .btn-download:active { transform: scale(0.98); }
+        .btn-download svg { width: 22px; height: 22px; fill: white; }
+
+        /* ======= STATUS TOAST ======= */
+        .status-bar {
+            text-align: center;
+            padding: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--green-700);
+            min-height: 40px;
+        }
+
+        /* ======= LOADING OVERLAY ======= */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .loading-overlay.visible { display: flex; }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-overlay p { color: white; font-size: 1rem; font-weight: 500; }
+
+        /* ======= LOCKED STATE ======= */
+        .locked-notice {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .locked-notice svg { width: 48px; height: 48px; fill: var(--border); margin-bottom: 12px; }
+        .locked-notice p { font-size: 0.9rem; }
+
+        /* Utility */
+        .mt-4 { margin-top: 16px; }
+        .mt-6 { margin-top: 24px; }
+
+        @media (max-width: 480px) {
+            .content-area { padding: 20px 16px; }
+            .sig-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading-overlay">
+    <div class="spinner"></div>
+    <p id="loading-text">処理中...</p>
+</div>
+
+<div class="app-shell">
+    <div class="app-header">
+        <h1>福祉用具サービス計画書 電子署名</h1>
+        <p>Welfare Equipment Service Plan — Digital Consent</p>
+    </div>
+
+    <div class="step-tabs">
+        <div class="step-tab active" id="tab-admin" onclick="showSection('admin')">
+            <span class="step-num">1</span>PDF準備
+        </div>
+        <div class="step-tab" id="tab-user" onclick="showSection('user')">
+            <span class="step-num">2</span>同意・署名
+        </div>
+        <div class="step-tab" id="tab-preview" onclick="showSection('preview')">
+            <span class="step-num">3</span>確認・保存
+        </div>
+    </div>
+
+    <div class="content-area">
+
+        <!-- ===== STEP 1: ADMIN ===== -->
+        <div id="section-admin" class="section-panel active">
+            <div class="upload-zone" id="upload-zone">
+                <div class="upload-icon">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h5v7h7v9H6z"/></svg>
+                </div>
+                <h3>PDFファイルをアップロード</h3>
+                <p>署名をもらう利用計画書を選択してください</p>
+                <label class="file-input-label">
+                    <input type="file" id="pdf-upload" accept="application/pdf">
+                    ファイルを選択
+                </label>
+            </div>
+
+            <div class="upload-success" id="upload-success">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                <span id="upload-filename">ファイル読み込み完了</span>
+            </div>
+
+            <button class="btn-next mt-6" id="btn-to-user">
+                次へ：同意・署名ページへ
+                <svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+            </button>
+        </div>
+
+        <!-- ===== STEP 2: USER ===== -->
+        <div id="section-user" class="section-panel">
+            <div id="user-locked" class="locked-notice">
+                <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                <p>管理者がPDFを読み込むまでお待ちください。</p>
+            </div>
+
+            <div id="user-input-area" style="display:none;">
+
+                <!-- Agreement Checkboxes -->
+                <div class="card">
+                    <div class="card-header">
+                        <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                        内容の確認（すべてにチェックを入れてください）
+                    </div>
+                    <div class="card-body">
+                        <label class="check-item" onclick="toggleCheck(this)">
+                            <input type="checkbox" class="agree-check">
+                            <span class="check-box"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+                            <span class="check-label">選択制対象の福祉用具に関する説明を受け、提案を受けました。</span>
+                        </label>
+                        <label class="check-item" onclick="toggleCheck(this)">
+                            <input type="checkbox" class="agree-check">
+                            <span class="check-box"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+                            <span class="check-label">全国平均貸与価格等についての説明を受けました。</span>
+                        </label>
+                        <label class="check-item" onclick="toggleCheck(this)">
+                            <input type="checkbox" class="agree-check">
+                            <span class="check-box"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+                            <span class="check-label">機能や価格の異なる複数の用具の提示を受けました。</span>
+                        </label>
+                        <label class="check-item" onclick="toggleCheck(this)">
+                            <input type="checkbox" class="agree-check">
+                            <span class="check-box"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+                            <span class="check-label">計画の内容に同意し、計画書の交付を受けました。</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Date -->
+                <div class="card">
+                    <div class="card-header">
+                        <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>
+                        同意日
+                    </div>
+                    <div class="card-body">
+                        <div class="date-row">
+                            <div class="date-field">
+                                <div class="field-label">
+                                    <span>年（西暦）</span>
+                                    <button class="btn-clear-canvas" onclick="clearCanvas('canvas-year')">クリア</button>
+                                </div>
+                                <div class="canvas-wrapper date-canvas">
+                                    <canvas id="canvas-year"></canvas>
+                                    <div class="canvas-placeholder">2025</div>
+                                </div>
+                            </div>
+                            <div class="date-field">
+                                <div class="field-label">
+                                    <span>月</span>
+                                    <button class="btn-clear-canvas" onclick="clearCanvas('canvas-month')">クリア</button>
+                                </div>
+                                <div class="canvas-wrapper date-canvas">
+                                    <canvas id="canvas-month"></canvas>
+                                    <div class="canvas-placeholder">月</div>
+                                </div>
+                            </div>
+                            <div class="date-field">
+                                <div class="field-label">
+                                    <span>日</span>
+                                    <button class="btn-clear-canvas" onclick="clearCanvas('canvas-day')">クリア</button>
+                                </div>
+                                <div class="canvas-wrapper date-canvas">
+                                    <canvas id="canvas-day"></canvas>
+                                    <div class="canvas-placeholder">日</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Signatures -->
+                <div class="card">
+                    <div class="card-header">
+                        <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                        署名
+                    </div>
+                    <div class="card-body">
+                        <div class="sig-grid">
+                            <div class="date-field">
+                                <div class="field-label">
+                                    <span>利用者署名</span>
+                                    <button class="btn-clear-canvas" onclick="clearCanvas('canvas-user')">クリア</button>
+                                </div>
+                                <div class="canvas-wrapper sig-canvas-wrap">
+                                    <canvas id="canvas-user"></canvas>
+                                    <div class="canvas-placeholder">ここに署名</div>
+                                </div>
+                            </div>
+                            <div class="date-field">
+                                <div class="field-label">
+                                    <span>代筆者署名</span>
+                                    <button class="btn-clear-canvas" onclick="clearCanvas('canvas-proxy')">クリア</button>
+                                </div>
+                                <div class="canvas-wrapper sig-canvas-wrap">
+                                    <canvas id="canvas-proxy"></canvas>
+                                    <div class="canvas-placeholder">ここに署名</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn-generate" id="generate-preview-btn">
+                    プレビューを生成する →
+                </button>
+                <div class="status-bar" id="status"></div>
+            </div>
+        </div>
+
+        <!-- ===== STEP 3: PREVIEW ===== -->
+        <div id="section-preview" class="section-panel">
+            <div id="preview-empty" class="locked-notice">
+                <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                <p>同意・署名タブでプレビューを生成してください。</p>
+            </div>
+            <div class="preview-section" id="preview-content">
+                <div class="pdf-scroll-area">
+                    <canvas id="preview-canvas"></canvas>
+                </div>
+                <button class="btn-download" id="download-btn">
+                    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                    PDFをダウンロード・保存
+                </button>
+            </div>
+        </div>
+
+    </div><!-- end content-area -->
+</div><!-- end app-shell -->
+
+<script>
+// ── GLOBALS ──────────────────────────────────────────────────────────
+const { PDFDocument, StandardFonts, rgb } = PDFLib;
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+let originalPdfBytes = null;
+let currentPdfWithSigs = null;
+const CANVAS_IDS = ['canvas-year', 'canvas-month', 'canvas-day', 'canvas-user', 'canvas-proxy'];
+const ctxMap = {};
+const drawnMap = {}; // track if drawn on each canvas
+
+// ── LOADING OVERLAY ───────────────────────────────────────────────────
+function showLoading(msg) {
+    document.getElementById('loading-text').textContent = msg || '処理中...';
+    document.getElementById('loading-overlay').classList.add('visible');
+}
+function hideLoading() {
+    document.getElementById('loading-overlay').classList.remove('visible');
+}
+
+// ── TAB NAVIGATION ────────────────────────────────────────────────────
+function showSection(name) {
+    if (name === 'user' && !originalPdfBytes) return;
+    if (name === 'preview' && !currentPdfWithSigs) return;
+
+    document.querySelectorAll('.section-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.step-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('section-' + name).classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+
+    if (name === 'user') {
+        setTimeout(() => initAllCanvases(), 50);
+    }
+}
+
+// ── PDF UPLOAD ────────────────────────────────────────────────────────
+document.getElementById('pdf-upload').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    showLoading('PDFを読み込んでいます...');
+    try {
+        originalPdfBytes = new Uint8Array(await file.arrayBuffer());
+        document.getElementById('upload-filename').textContent = file.name + '　読み込み完了！';
+        document.getElementById('upload-success').classList.add('visible');
+        document.getElementById('btn-to-user').classList.add('enabled');
+        document.getElementById('tab-user').classList.add('done');
+    } catch(err) {
+        alert('PDFの読み込みに失敗しました。ファイルを確認してください。');
+        console.error(err);
+    }
+    hideLoading();
+});
+
+document.getElementById('btn-to-user').addEventListener('click', () => {
+    if (!originalPdfBytes) return;
+    document.getElementById('user-locked').style.display = 'none';
+    document.getElementById('user-input-area').style.display = 'block';
+    showSection('user');
+});
+
+// ── CANVAS INIT ───────────────────────────────────────────────────────
+function initCanvas(id) {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    const wrapper = canvas.parentElement;
+    // Set actual pixel dimensions
+    const dpr = window.devicePixelRatio || 1;
+    const w = wrapper.clientWidth;
+    const h = wrapper.clientHeight;
+    canvas.width  = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width  = w + 'px';
+    canvas.style.height = h + 'px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.lineWidth = 3;
+    ctx.lineCap   = 'round';
+    ctx.lineJoin  = 'round';
+    ctx.strokeStyle = '#1a1a1a';
+    ctxMap[id] = { ctx, dpr, w, h };
+    drawnMap[id] = false;
+}
+
+function initAllCanvases() {
+    CANVAS_IDS.forEach(id => initCanvas(id));
+}
+
+function clearCanvas(id) {
+    const entry = ctxMap[id];
+    if (!entry) return;
+    entry.ctx.clearRect(0, 0, entry.w, entry.h);
+    drawnMap[id] = false;
+    // Show placeholder again
+    const canvas = document.getElementById(id);
+    const placeholder = canvas.parentElement.querySelector('.canvas-placeholder');
+    if (placeholder) placeholder.style.opacity = '1';
+}
+
+// ── DRAWING ───────────────────────────────────────────────────────────
+function getEventPos(canvas, e) {
+    const rect = canvas.getBoundingClientRect();
+    const src  = e.touches ? e.touches[0] : e;
+    return {
+        x: src.clientX - rect.left,
+        y: src.clientY - rect.top
+    };
+}
+
+let activeDrawId = null;
+let isDrawing = false;
+
+function setupDrawListeners() {
+    CANVAS_IDS.forEach(id => {
+        const canvas = document.getElementById(id);
+        if (!canvas) return;
+
+        const startDraw = (e) => {
+            if (!ctxMap[id]) return;
+            e.preventDefault();
+            e.stopPropagation();
+            activeDrawId = id;
+            isDrawing = true;
+            const pos = getEventPos(canvas, e);
+            ctxMap[id].ctx.beginPath();
+            ctxMap[id].ctx.moveTo(pos.x, pos.y);
+            // Hide placeholder
+            const placeholder = canvas.parentElement.querySelector('.canvas-placeholder');
+            if (placeholder) placeholder.style.opacity = '0';
+            drawnMap[id] = true;
+        };
+
+        const draw = (e) => {
+            if (!isDrawing || activeDrawId !== id || !ctxMap[id]) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const pos = getEventPos(canvas, e);
+            ctxMap[id].ctx.lineTo(pos.x, pos.y);
+            ctxMap[id].ctx.stroke();
+        };
+
+        canvas.addEventListener('mousedown',  startDraw, { passive: false });
+        canvas.addEventListener('mousemove',  draw,      { passive: false });
+        canvas.addEventListener('touchstart', startDraw, { passive: false });
+        canvas.addEventListener('touchmove',  draw,      { passive: false });
+    });
+
+    const stopDraw = () => { isDrawing = false; activeDrawId = null; };
+    window.addEventListener('mouseup',   stopDraw);
+    window.addEventListener('touchend',  stopDraw);
+    window.addEventListener('touchcancel', stopDraw);
+}
+
+// ── CHECKBOX TOGGLE ───────────────────────────────────────────────────
+function toggleCheck(label) {
+    // Already handled by native checkbox, but we call it for custom styling
+    // The CSS :checked handles the visual
+}
+
+// ── GENERATE PDF + PREVIEW ────────────────────────────────────────────
+document.getElementById('generate-preview-btn').addEventListener('click', async () => {
+    if (!originalPdfBytes) {
+        alert('PDFが読み込まれていません。');
+        return;
+    }
+    showLoading('PDFを生成しています...');
+    document.getElementById('status').textContent = '';
+
+    try {
+        const pdfDoc   = await PDFDocument.load(originalPdfBytes.slice());
+        const pages    = pdfDoc.getPages();
+        const firstPage = pages[0];
+        const font     = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+        // チェックボックス
+        const checkCoords = [
+            { x: 50, y: 144 },
+            { x: 50, y: 124 },
+            { x: 50, y: 104 },
+            { x: 50, y: 84  }
+        ];
+        document.querySelectorAll('.agree-check').forEach((cb, idx) => {
+            if (cb.checked) {
+                // HelveticaBold はラテン文字のみ対応のため 'V' を使用（✓ は例外が発生する）
+                firstPage.drawText('V', { x: checkCoords[idx].x, y: checkCoords[idx].y, size: 10, font });
+            }
+        });
+
+        // 署名・日付を埋め込む
+        const embedConfig = [
+            { id: 'canvas-year',  x: 405, y: 130, w: 50,  h: 25 },
+            { id: 'canvas-month', x: 455, y: 130, w: 40,  h: 25 },
+            { id: 'canvas-day',   x: 498, y: 130, w: 40,  h: 25 },
+            { id: 'canvas-user',  x: 420, y: 100, w: 120, h: 35 },
+            { id: 'canvas-proxy', x: 420, y: 75,  w: 120, h: 35 }
+        ];
+
+        for (const item of embedConfig) {
+            if (!drawnMap[item.id]) continue;
+            const canvas = document.getElementById(item.id);
+            const dataUrl = canvas.toDataURL('image/png');
+            const entry = ctxMap[item.id];
+            if (!entry) continue;
+            // 実ピクセル数（dpr倍）で getImageData を取得する
+            const pw = canvas.width;
+            const ph = canvas.height;
+            const imgData = entry.ctx.getImageData(0, 0, pw, ph).data;
+            let hasPixel = false;
+            for (let i = 3; i < imgData.length; i += 4) {
+                if (imgData[i] > 10) { hasPixel = true; break; }
+            }
+            if (!hasPixel) continue;
+
+            const pngImg = await pdfDoc.embedPng(dataUrl);
+            firstPage.drawImage(pngImg, { x: item.x, y: item.y, width: item.w, height: item.h });
+        }
+
+        // タイムスタンプ
+        const now = new Date();
+        const pad = n => n.toString().padStart(2, '0');
+        const ts  = `Timestamp: ${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        const { width } = firstPage.getSize();
+        firstPage.drawText(ts, { x: width - 210, y: 10, size: 7, font, color: rgb(0.4,0.4,0.4) });
+
+        currentPdfWithSigs = await pdfDoc.save();
+
+        // PDF.js プレビュー
+        showLoading('プレビューを描画しています...');
+        const blob = new Blob([currentPdfWithSigs], { type: 'application/pdf' });
+        const url  = URL.createObjectURL(blob);
+        const pdf  = await pdfjsLib.getDocument(url).promise;
+        const page = await pdf.getPage(1);
+
+        const previewCanvas = document.getElementById('preview-canvas');
+        const viewport = page.getViewport({ scale: 1.5 });
+        previewCanvas.width  = viewport.width;
+        previewCanvas.height = viewport.height;
+        previewCanvas.style.width  = viewport.width  + 'px';
+        previewCanvas.style.height = viewport.height + 'px';
+        await page.render({ canvasContext: previewCanvas.getContext('2d'), viewport }).promise;
+
+        // Show preview section
+        document.getElementById('preview-empty').style.display   = 'none';
+        document.getElementById('preview-content').classList.add('visible');
+        document.getElementById('tab-preview').classList.add('done');
+
+        hideLoading();
+        showSection('preview');
+
+    } catch (err) {
+        hideLoading();
+        document.getElementById('status').textContent = '⚠ エラーが発生しました。再度お試しください。';
+        console.error(err);
+    }
+});
+
+// ── DOWNLOAD ─────────────────────────────────────────────────────────
+document.getElementById('download-btn').addEventListener('click', () => {
+    if (!currentPdfWithSigs) return;
+    const blob = new Blob([currentPdfWithSigs], { type: 'application/pdf' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = '署名済み_福祉用具サービス計画書.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+    // ダウンロード完了後、次の利用者のためにリセット
+    setTimeout(() => resetForNext(), 800);
+});
+
+// ── RESET FOR NEXT USER ───────────────────────────────────────────────
+function resetForNext() {
+    // 状態を完全リセット
+    currentPdfWithSigs = null;
+    originalPdfBytes = null;
+
+    // チェックボックスをすべて外す
+    document.querySelectorAll('.agree-check').forEach(cb => cb.checked = false);
+
+    // 全キャンバスをクリア
+    CANVAS_IDS.forEach(id => {
+        clearCanvas(id);
+        drawnMap[id] = false;
+    });
+
+    // ステータス・プレビューをリセット
+    document.getElementById('status').textContent = '';
+    document.getElementById('preview-content').classList.remove('visible');
+    document.getElementById('preview-empty').style.display = 'block';
+
+    // アップロードエリアをリセット
+    document.getElementById('upload-success').classList.remove('visible');
+    document.getElementById('upload-filename').textContent = '';
+    document.getElementById('pdf-upload').value = '';
+    document.getElementById('btn-to-user').classList.remove('enabled');
+
+    // 利用者入力エリアを非表示に戻す
+    document.getElementById('user-locked').style.display = 'block';
+    document.getElementById('user-input-area').style.display = 'none';
+
+    // 全タブをリセットしてタブ1（PDF準備）に戻る
+    document.querySelectorAll('.section-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.step-tab').forEach(t => t.classList.remove('active', 'done'));
+    document.getElementById('section-admin').classList.add('active');
+    document.getElementById('tab-admin').classList.add('active');
+
+    // 完了メッセージをタブ1に一時表示
+    document.getElementById('admin-status').textContent = '✅ 保存完了！次のPDFをアップロードしてください。';
+    setTimeout(() => { document.getElementById('admin-status').textContent = ''; }, 4000);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+    setupDrawListeners();
+});
+
+// Reinitialize canvases on orientation change (iPad landscape/portrait)
+window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+        if (document.getElementById('section-user').classList.contains('active')) {
+            initAllCanvases();
+        }
+    }, 300);
+});
+</script>
+</body>
+</html>
