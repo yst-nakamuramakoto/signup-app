@@ -33,19 +33,26 @@
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        html, body {
-            height: 100%;
+        /* ▼ 修正①: html/body の height:100% を削除しページ全体がスクロール可能に */
+        html {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            -webkit-text-size-adjust: 100%;
+        }
+        body {
             font-family: 'Noto Sans JP', sans-serif;
             background: var(--bg);
             color: var(--text-primary);
             -webkit-tap-highlight-color: transparent;
-            -webkit-text-size-adjust: 100%;
+            /* height: 100% を削除 — ページ全体スクロールを妨げないため */
         }
 
         /* ======= LAYOUT ======= */
         .app-shell {
             display: flex;
             flex-direction: column;
+            /* min-height: 100vh を維持しつつ高さは内容に応じて伸びる */
             min-height: 100vh;
             max-width: 900px;
             margin: 0 auto;
@@ -276,7 +283,7 @@
         /* ======= DATE FIELDS ======= */
         .date-row {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 10px;
         }
         .date-field { display: flex; flex-direction: column; }
@@ -297,7 +304,7 @@
             border: 2px solid var(--border);
             border-radius: var(--radius-sm);
             overflow: hidden;
-            touch-action: none;
+            /* ▼ 修正②: canvas-wrapper 自体は touch-action を制限しない */
         }
         .canvas-wrapper.date-canvas {
             height: 90px;
@@ -305,13 +312,15 @@
         .canvas-wrapper.sig-canvas-wrap {
             height: 180px;
         }
+
+        /* ▼ 修正③: canvas の touch-action: none を削除（JSで個別制御） */
         canvas {
             display: block;
             width: 100%;
             height: 100%;
             cursor: crosshair;
-            touch-action: none;
         }
+
         .canvas-placeholder {
             position: absolute;
             inset: 0;
@@ -335,6 +344,20 @@
             transition: all 0.15s;
         }
         .btn-clear-canvas:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
+        .btn-clear-pdf {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 3px 10px;
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .btn-clear-pdf:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
 
         .sig-grid {
             display: grid;
@@ -364,10 +387,12 @@
         .preview-section { display: none; }
         .preview-section.visible { display: block; }
 
+        /* ▼ 修正④: PDFスクロールエリアに -webkit-overflow-scrolling と明示的なスクロール設定 */
         .pdf-scroll-area {
             width: 100%;
             overflow-x: auto;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch; /* iOSのモメンタムスクロール有効化 */
             background: #525659;
             border-radius: var(--radius-md);
             padding: 20px;
@@ -414,12 +439,13 @@
         }
 
         /* ======= LOADING OVERLAY ======= */
+        /* ▼ 修正⑤: position:fixed はスクロールに影響しないが、z-indexを明示 */
         .loading-overlay {
             display: none;
             position: fixed;
             inset: 0;
             background: rgba(0,0,0,0.45);
-            z-index: 999;
+            z-index: 9999;
             align-items: center;
             justify-content: center;
             flex-direction: column;
@@ -498,8 +524,9 @@
             </div>
 
             <div class="upload-success" id="upload-success">
-                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-                <span id="upload-filename">ファイル読み込み完了</span>
+                <svg viewBox="0 0 24 24" style="flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                <span id="upload-filename" style="flex:1;">ファイル読み込み完了</span>
+                <button onclick="clearUploadedPdf()" class="btn-clear-pdf">クリア</button>
             </div>
 
             <!-- PDF プレビュー（アップロード後に表示） -->
@@ -518,6 +545,8 @@
                     <button class="btn-clear-canvas" id="admin-next-btn" onclick="adminChangePage(1)" style="padding:8px 18px; font-size:0.85rem;">次ページ ▶</button>
                 </div>
             </div>
+
+            <div class="status-bar" id="admin-status"></div>
 
             <button class="btn-next mt-6" id="btn-to-user">
                 次へ：同意・署名ページへ
@@ -613,9 +642,11 @@
                         署名
                     </div>
                     <div class="card-body">
-                        <div class="sig-grid">
-                            <div class="date-field">
-                                <div class="field-label">
+
+                        <!-- 利用者署名：代筆者署名(flex:7)と同幅 -->
+                        <div style="display:flex; gap:12px;">
+                            <div style="flex:7;">
+                                <div class="field-label" style="margin-bottom:6px;">
                                     <span>利用者署名</span>
                                     <button class="btn-clear-canvas" onclick="clearCanvas('canvas-user')">クリア</button>
                                 </div>
@@ -624,8 +655,15 @@
                                     <div class="canvas-placeholder">ここに署名</div>
                                 </div>
                             </div>
-                            <div class="date-field">
-                                <div class="field-label">
+                            <div style="flex:3; visibility:hidden;"></div>
+                        </div>
+
+                        <!-- 代筆者エリア：代筆者署名(7) + 続柄(3) -->
+                        <div style="margin-top:10px;"></div>
+                        <div style="display:flex; gap:12px; align-items:flex-start;">
+                            <!-- 代筆者署名 -->
+                            <div style="flex:7;">
+                                <div class="field-label" style="margin-bottom:6px;">
                                     <span>代筆者署名</span>
                                     <button class="btn-clear-canvas" onclick="clearCanvas('canvas-proxy')">クリア</button>
                                 </div>
@@ -634,7 +672,19 @@
                                     <div class="canvas-placeholder">ここに署名</div>
                                 </div>
                             </div>
+                            <!-- 続柄 -->
+                            <div style="flex:3;">
+                                <div class="field-label" style="margin-bottom:6px;">
+                                    <span>続柄</span>
+                                    <button class="btn-clear-canvas" onclick="clearCanvas('canvas-relation')">クリア</button>
+                                </div>
+                                <div class="canvas-wrapper sig-canvas-wrap">
+                                    <canvas id="canvas-relation"></canvas>
+                                    <div class="canvas-placeholder">例：長男</div>
+                                </div>
+                            </div>
                         </div>
+
                     </div>
                 </div>
 
@@ -652,7 +702,10 @@
                 <p>同意・署名タブでプレビューを生成してください。</p>
             </div>
             <div class="preview-section" id="preview-content">
-                <div class="pdf-scroll-area">
+                <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:10px; text-align:center;">
+                    ↕ グレーのエリアをスワイプしてスクロールできます
+                </p>
+                <div class="pdf-scroll-area" id="preview-scroll-area">
                     <canvas id="preview-canvas"></canvas>
                 </div>
                 <button class="btn-download" id="download-btn">
@@ -672,9 +725,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
 let originalPdfBytes = null;
 let currentPdfWithSigs = null;
-const CANVAS_IDS = ['canvas-year', 'canvas-month', 'canvas-day', 'canvas-user', 'canvas-proxy'];
+const CANVAS_IDS = ['canvas-year', 'canvas-month', 'canvas-day', 'canvas-user', 'canvas-proxy', 'canvas-relation'];
 const ctxMap = {};
-const drawnMap = {}; // track if drawn on each canvas
+const drawnMap = {};
+
 
 // ── LOADING OVERLAY ───────────────────────────────────────────────────
 function showLoading(msg) {
@@ -696,12 +750,18 @@ function showSection(name) {
     document.getElementById('tab-' + name).classList.add('active');
 
     if (name === 'user') {
+        // PDFが読み込まれていれば入力エリアを表示（タブ直接押下でも対応）
+        if (originalPdfBytes) {
+            document.getElementById('user-locked').style.display = 'none';
+            document.getElementById('user-input-area').style.display = 'block';
+        }
         setTimeout(() => initAllCanvases(), 50);
     }
+
+    window.scrollTo(0, 0);
 }
 
 // ── PDF UPLOAD ────────────────────────────────────────────────────────
-// ── ADMIN PDF PREVIEW ─────────────────────────────────────────────────
 let adminPdfDoc   = null;
 let adminCurPage  = 1;
 let adminTotalPages = 1;
@@ -743,7 +803,6 @@ document.getElementById('pdf-upload').addEventListener('change', async (e) => {
         document.getElementById('btn-to-user').classList.add('enabled');
         document.getElementById('tab-user').classList.add('done');
 
-        // PDF.js でプレビュー描画
         const blob = new Blob([originalPdfBytes], { type: 'application/pdf' });
         const url  = URL.createObjectURL(blob);
         adminPdfDoc    = await pdfjsLib.getDocument(url).promise;
@@ -771,10 +830,17 @@ function initCanvas(id) {
     const canvas = document.getElementById(id);
     if (!canvas) return;
     const wrapper = canvas.parentElement;
-    // Set actual pixel dimensions
     const dpr = window.devicePixelRatio || 1;
     const w = wrapper.clientWidth;
     const h = wrapper.clientHeight;
+
+    // 描画済みの場合は内容を退避してリサイズ後に復元する
+    const alreadyDrawn = drawnMap[id];
+    let savedImage = null;
+    if (alreadyDrawn && canvas.width > 0 && canvas.height > 0) {
+        savedImage = canvas.toDataURL('image/png');
+    }
+
     canvas.width  = w * dpr;
     canvas.height = h * dpr;
     canvas.style.width  = w + 'px';
@@ -787,7 +853,23 @@ function initCanvas(id) {
     ctx.lineJoin  = 'round';
     ctx.strokeStyle = '#1a1a1a';
     ctxMap[id] = { ctx, dpr, w, h };
-    drawnMap[id] = false;
+
+    if (savedImage) {
+        const img = new Image();
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0, w, h);
+            ctxMap[id].ctx.lineWidth = 3;
+            ctxMap[id].ctx.lineCap   = 'round';
+            ctxMap[id].ctx.lineJoin  = 'round';
+            ctxMap[id].ctx.strokeStyle = '#1a1a1a';
+        };
+        img.src = savedImage;
+        drawnMap[id] = true;
+        const placeholder = canvas.parentElement.querySelector('.canvas-placeholder');
+        if (placeholder) placeholder.style.opacity = '0';
+    } else {
+        drawnMap[id] = false;
+    }
 }
 
 function initAllCanvases() {
@@ -799,7 +881,6 @@ function clearCanvas(id) {
     if (!entry) return;
     entry.ctx.clearRect(0, 0, entry.w, entry.h);
     drawnMap[id] = false;
-    // Show placeholder again
     const canvas = document.getElementById(id);
     const placeholder = canvas.parentElement.querySelector('.canvas-placeholder');
     if (placeholder) placeholder.style.opacity = '1';
@@ -825,14 +906,17 @@ function setupDrawListeners() {
 
         const startDraw = (e) => {
             if (!ctxMap[id]) return;
-            e.preventDefault();
-            e.stopPropagation();
+            // ▼ 修正⑧: touchstart/touchmove のみ preventDefault（mouseは不要）
+            // これにより署名キャンバス上のみタッチをキャプチャし、
+            // それ以外の領域ではページスクロールを妨げない
+            if (e.type === 'touchstart' || e.type === 'touchmove') {
+                e.preventDefault();
+            }
             activeDrawId = id;
             isDrawing = true;
             const pos = getEventPos(canvas, e);
             ctxMap[id].ctx.beginPath();
             ctxMap[id].ctx.moveTo(pos.x, pos.y);
-            // Hide placeholder
             const placeholder = canvas.parentElement.querySelector('.canvas-placeholder');
             if (placeholder) placeholder.style.opacity = '0';
             drawnMap[id] = true;
@@ -840,29 +924,31 @@ function setupDrawListeners() {
 
         const draw = (e) => {
             if (!isDrawing || activeDrawId !== id || !ctxMap[id]) return;
-            e.preventDefault();
-            e.stopPropagation();
+            if (e.type === 'touchstart' || e.type === 'touchmove') {
+                e.preventDefault();
+            }
             const pos = getEventPos(canvas, e);
             ctxMap[id].ctx.lineTo(pos.x, pos.y);
             ctxMap[id].ctx.stroke();
         };
 
-        canvas.addEventListener('mousedown',  startDraw, { passive: false });
-        canvas.addEventListener('mousemove',  draw,      { passive: false });
+        // ▼ 修正⑨: passive:false は touchstart/touchmove のみに限定
+        // → 署名キャンバス外ではデフォルトのタッチスクロールが働く
+        canvas.addEventListener('mousedown',  startDraw);
+        canvas.addEventListener('mousemove',  draw);
         canvas.addEventListener('touchstart', startDraw, { passive: false });
         canvas.addEventListener('touchmove',  draw,      { passive: false });
     });
 
     const stopDraw = () => { isDrawing = false; activeDrawId = null; };
-    window.addEventListener('mouseup',   stopDraw);
-    window.addEventListener('touchend',  stopDraw);
+    window.addEventListener('mouseup',     stopDraw);
+    window.addEventListener('touchend',    stopDraw);
     window.addEventListener('touchcancel', stopDraw);
 }
 
 // ── CHECKBOX TOGGLE ───────────────────────────────────────────────────
 function toggleCheck(label) {
-    // Already handled by native checkbox, but we call it for custom styling
-    // The CSS :checked handles the visual
+    // CSS :checked でビジュアル制御
 }
 
 // ── GENERATE PDF + PREVIEW ────────────────────────────────────────────
@@ -880,7 +966,6 @@ document.getElementById('generate-preview-btn').addEventListener('click', async 
         const firstPage = pages[0];
         const font     = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-        // チェックボックス
         const checkCoords = [
             { x: 50, y: 144 },
             { x: 50, y: 124 },
@@ -889,18 +974,17 @@ document.getElementById('generate-preview-btn').addEventListener('click', async 
         ];
         document.querySelectorAll('.agree-check').forEach((cb, idx) => {
             if (cb.checked) {
-                // HelveticaBold はラテン文字のみ対応のため 'V' を使用（✓ は例外が発生する）
                 firstPage.drawText('V', { x: checkCoords[idx].x, y: checkCoords[idx].y, size: 10, font });
             }
         });
 
-        // 署名・日付を埋め込む
         const embedConfig = [
-            { id: 'canvas-year',  x: 405, y: 130, w: 50,  h: 25 },
-            { id: 'canvas-month', x: 455, y: 130, w: 40,  h: 25 },
-            { id: 'canvas-day',   x: 498, y: 130, w: 40,  h: 25 },
-            { id: 'canvas-user',  x: 420, y: 100, w: 120, h: 35 },
-            { id: 'canvas-proxy', x: 420, y: 75,  w: 120, h: 35 }
+            { id: 'canvas-year',     x: 405, y: 130, w: 40,  h: 25 },
+            { id: 'canvas-month',    x: 455, y: 130, w: 40,  h: 25 },
+            { id: 'canvas-day',      x: 498, y: 130, w: 40,  h: 25 },
+            { id: 'canvas-user',     x: 420, y: 100, w: 120, h: 25 },
+            { id: 'canvas-proxy',    x: 420, y: 80,  w: 120, h: 25 },
+            { id: 'canvas-relation', x: 395, y: 80,  w:  35, h: 15 },
         ];
 
         for (const item of embedConfig) {
@@ -909,7 +993,6 @@ document.getElementById('generate-preview-btn').addEventListener('click', async 
             const dataUrl = canvas.toDataURL('image/png');
             const entry = ctxMap[item.id];
             if (!entry) continue;
-            // 実ピクセル数（dpr倍）で getImageData を取得する
             const pw = canvas.width;
             const ph = canvas.height;
             const imgData = entry.ctx.getImageData(0, 0, pw, ph).data;
@@ -923,7 +1006,6 @@ document.getElementById('generate-preview-btn').addEventListener('click', async 
             firstPage.drawImage(pngImg, { x: item.x, y: item.y, width: item.w, height: item.h });
         }
 
-        // タイムスタンプ
         const now = new Date();
         const pad = n => n.toString().padStart(2, '0');
         const ts  = `Timestamp: ${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
@@ -932,28 +1014,34 @@ document.getElementById('generate-preview-btn').addEventListener('click', async 
 
         currentPdfWithSigs = await pdfDoc.save();
 
-        // PDF.js プレビュー
         showLoading('プレビューを描画しています...');
         const blob = new Blob([currentPdfWithSigs], { type: 'application/pdf' });
         const url  = URL.createObjectURL(blob);
         const pdf  = await pdfjsLib.getDocument(url).promise;
         const page = await pdf.getPage(1);
 
+        // ▼ 先にセクションを表示してからサイズを計算する（display:none時はclientWidth=0になるため）
+        document.getElementById('preview-empty').style.display   = 'none';
+        document.getElementById('preview-content').classList.add('visible');
+        document.getElementById('tab-preview').classList.add('done');
+        showSection('preview');
+
         const previewCanvas = document.getElementById('preview-canvas');
-        const viewport = page.getViewport({ scale: 1.5 });
+
+        // セクションが表示された後でスクロールエリアの幅を取得してスケールを計算
+        const scrollArea = document.getElementById('preview-scroll-area');
+        const vp0 = page.getViewport({ scale: 1 });
+        const availWidth = Math.max(scrollArea.clientWidth - 40, 300); // 最小幅300を保証
+        const scale = Math.min(1.8, availWidth / vp0.width);
+        const viewport = page.getViewport({ scale });
+
         previewCanvas.width  = viewport.width;
         previewCanvas.height = viewport.height;
         previewCanvas.style.width  = viewport.width  + 'px';
         previewCanvas.style.height = viewport.height + 'px';
         await page.render({ canvasContext: previewCanvas.getContext('2d'), viewport }).promise;
 
-        // Show preview section
-        document.getElementById('preview-empty').style.display   = 'none';
-        document.getElementById('preview-content').classList.add('visible');
-        document.getElementById('tab-preview').classList.add('done');
-
         hideLoading();
-        showSection('preview');
 
     } catch (err) {
         hideLoading();
@@ -965,6 +1053,17 @@ document.getElementById('generate-preview-btn').addEventListener('click', async 
 // ── DOWNLOAD ─────────────────────────────────────────────────────────
 document.getElementById('download-btn').addEventListener('click', () => {
     if (!currentPdfWithSigs) return;
+
+    // 未チェック項目がある場合は確認ダイアログを表示
+    const checks = document.querySelectorAll('.agree-check');
+    const uncheckedCount = Array.from(checks).filter(cb => !cb.checked).length;
+    if (uncheckedCount > 0) {
+        const ok = window.confirm(
+            `同意されていない項目が ${uncheckedCount} 件あります。\nこのまま処理を進めますか？`
+        );
+        if (!ok) return;
+    }
+
     const blob = new Blob([currentPdfWithSigs], { type: 'application/pdf' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
@@ -975,37 +1074,56 @@ document.getElementById('download-btn').addEventListener('click', () => {
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 10000);
 
-    // ダウンロード完了後、次の利用者のためにリセット
     setTimeout(() => resetForNext(), 800);
 });
 
-// ── RESET FOR NEXT USER ───────────────────────────────────────────────
-function resetForNext() {
-    // 状態を完全リセット
-    currentPdfWithSigs = null;
+// ── CLEAR UPLOADED PDF ───────────────────────────────────────────────
+function clearUploadedPdf() {
     originalPdfBytes = null;
 
-    // チェックボックスをすべて外す
-    document.querySelectorAll('.agree-check').forEach(cb => cb.checked = false);
-
-    // 全キャンバスをクリア
-    CANVAS_IDS.forEach(id => {
-        clearCanvas(id);
-        drawnMap[id] = false;
-    });
-
-    // ステータス・プレビューをリセット
-    document.getElementById('status').textContent = '';
-    document.getElementById('preview-content').classList.remove('visible');
-    document.getElementById('preview-empty').style.display = 'block';
-
-    // アップロードエリアをリセット
+    // アップロード表示をリセット
     document.getElementById('upload-success').classList.remove('visible');
     document.getElementById('upload-filename').textContent = '';
     document.getElementById('pdf-upload').value = '';
     document.getElementById('btn-to-user').classList.remove('enabled');
 
-    // 管理者プレビューをリセット
+    // PDFプレビューを非表示
+    document.getElementById('admin-pdf-preview').style.display = 'none';
+    adminPdfDoc = null;
+    adminCurPage = 1;
+    adminTotalPages = 1;
+    const adminCanvas = document.getElementById('admin-preview-canvas');
+    if (adminCanvas) {
+        const ctx = adminCanvas.getContext('2d');
+        ctx.clearRect(0, 0, adminCanvas.width, adminCanvas.height);
+    }
+
+    // ②③タブのdone状態もリセット
+    document.getElementById('tab-user').classList.remove('done');
+    document.getElementById('tab-preview').classList.remove('done');
+}
+
+// ── RESET FOR NEXT USER ───────────────────────────────────────────────
+function resetForNext() {
+    currentPdfWithSigs = null;
+    originalPdfBytes = null;
+
+    document.querySelectorAll('.agree-check').forEach(cb => cb.checked = false);
+
+    CANVAS_IDS.forEach(id => {
+        clearCanvas(id);
+        drawnMap[id] = false;
+    });
+
+    document.getElementById('status').textContent = '';
+    document.getElementById('preview-content').classList.remove('visible');
+    document.getElementById('preview-empty').style.display = 'block';
+
+    document.getElementById('upload-success').classList.remove('visible');
+    document.getElementById('upload-filename').textContent = '';
+    document.getElementById('pdf-upload').value = '';
+    document.getElementById('btn-to-user').classList.remove('enabled');
+
     document.getElementById('admin-pdf-preview').style.display = 'none';
     adminPdfDoc = null;
     adminCurPage = 1;
@@ -1013,19 +1131,17 @@ function resetForNext() {
     const adminCanvas = document.getElementById('admin-preview-canvas');
     if (adminCanvas) adminCanvas.getContext('2d').clearRect(0, 0, adminCanvas.width, adminCanvas.height);
 
-    // 利用者入力エリアを非表示に戻す
     document.getElementById('user-locked').style.display = 'block';
     document.getElementById('user-input-area').style.display = 'none';
 
-    // 全タブをリセットしてタブ1（PDF準備）に戻る
     document.querySelectorAll('.section-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.step-tab').forEach(t => t.classList.remove('active', 'done'));
     document.getElementById('section-admin').classList.add('active');
     document.getElementById('tab-admin').classList.add('active');
 
-    // 完了メッセージをタブ1に一時表示
     document.getElementById('admin-status').textContent = '✅ 保存完了！次のPDFをアップロードしてください。';
     setTimeout(() => { document.getElementById('admin-status').textContent = ''; }, 4000);
+    window.scrollTo(0, 0);
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────
@@ -1033,7 +1149,6 @@ window.addEventListener('load', () => {
     setupDrawListeners();
 });
 
-// Reinitialize canvases on orientation change (iPad landscape/portrait)
 window.addEventListener('orientationchange', () => {
     setTimeout(() => {
         if (document.getElementById('section-user').classList.contains('active')) {
