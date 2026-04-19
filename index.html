@@ -523,6 +523,41 @@
                 </label>
             </div>
 
+            <!-- ファイル名入力 -->
+            <div class="card" style="margin-top:20px;">
+                <div class="card-header">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h5v7h7v9H6z"/></svg>
+                    保存ファイル名
+                </div>
+                <div class="card-body">
+                    <div class="field-label" style="margin-bottom:6px;">
+                        <span>利用者名（ファイル名に使用）</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input type="text" id="pdf-filename-input"
+                            placeholder="例：山田太郎"
+                            style="
+                                flex:1;
+                                padding: 10px 12px;
+                                border: 1.5px solid var(--border);
+                                border-radius: var(--radius-sm);
+                                font-size: 0.9rem;
+                                font-family: inherit;
+                                color: var(--text-primary);
+                                background: white;
+                                outline: none;
+                                transition: border-color 0.2s;
+                            "
+                            onfocus="this.style.borderColor='var(--green-500)'"
+                            onblur="this.style.borderColor='var(--border)'"
+                        >
+                    </div>
+                    <p style="font-size:0.75rem; color:var(--text-muted); margin-top:6px;">
+                        未入力の場合は「署名済み福祉用具サービス計画書」になります
+                    </p>
+                </div>
+            </div>
+
             <div class="upload-success" id="upload-success">
                 <svg viewBox="0 0 24 24" style="flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
                 <span id="upload-filename" style="flex:1;">ファイル読み込み完了</span>
@@ -959,11 +994,12 @@ document.getElementById('generate-preview-btn').addEventListener('click', async 
     }
     showLoading('PDFを生成しています...');
     document.getElementById('status').textContent = '';
+    //document.getElementById('pdf-filename-input').value = '';
 
     try {
         const pdfDoc   = await PDFDocument.load(originalPdfBytes.slice());
         const pages    = pdfDoc.getPages();
-        const firstPage = pages[0];
+        const lastPage = pages[pages.length - 1]; // 最終ページに反映
         const font     = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
         const checkCoords = [
@@ -974,7 +1010,7 @@ document.getElementById('generate-preview-btn').addEventListener('click', async 
         ];
         document.querySelectorAll('.agree-check').forEach((cb, idx) => {
             if (cb.checked) {
-                firstPage.drawText('V', { x: checkCoords[idx].x, y: checkCoords[idx].y, size: 10, font });
+                lastPage.drawText('V', { x: checkCoords[idx].x, y: checkCoords[idx].y, size: 10, font });
             }
         });
 
@@ -1003,14 +1039,14 @@ document.getElementById('generate-preview-btn').addEventListener('click', async 
             if (!hasPixel) continue;
 
             const pngImg = await pdfDoc.embedPng(dataUrl);
-            firstPage.drawImage(pngImg, { x: item.x, y: item.y, width: item.w, height: item.h });
+            lastPage.drawImage(pngImg, { x: item.x, y: item.y, width: item.w, height: item.h });
         }
 
         const now = new Date();
         const pad = n => n.toString().padStart(2, '0');
         const ts  = `Timestamp: ${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-        const { width } = firstPage.getSize();
-        firstPage.drawText(ts, { x: width - 210, y: 10, size: 7, font, color: rgb(0.4,0.4,0.4) });
+        const { width } = lastPage.getSize();
+        lastPage.drawText(ts, { x: width - 210, y: 10, size: 7, font, color: rgb(0.4,0.4,0.4) });
 
         currentPdfWithSigs = await pdfDoc.save();
 
@@ -1018,7 +1054,7 @@ document.getElementById('generate-preview-btn').addEventListener('click', async 
         const blob = new Blob([currentPdfWithSigs], { type: 'application/pdf' });
         const url  = URL.createObjectURL(blob);
         const pdf  = await pdfjsLib.getDocument(url).promise;
-        const page = await pdf.getPage(1);
+        const page = await pdf.getPage(pdf.numPages); // 最終ページをプレビュー表示
 
         // ▼ 先にセクションを表示してからサイズを計算する（display:none時はclientWidth=0になるため）
         document.getElementById('preview-empty').style.display   = 'none';
@@ -1064,15 +1100,25 @@ document.getElementById('download-btn').addEventListener('click', () => {
         if (!ok) return;
     }
 
-    const blob = new Blob([currentPdfWithSigs], { type: 'application/pdf' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = '署名済み_福祉用具サービス計画書.pdf';
+    const nameInput = document.getElementById('pdf-filename-input').value.trim();
+    const fileName = nameInput
+        ? nameInput + '_署名済み福祉用具サービス計画書.pdf'
+        : '署名済み福祉用具サービス計画書.pdf';
+
+    // Data URLを使うことでブラウザ問わずファイル名を確実に反映させる
+    const uint8 = new Uint8Array(currentPdfWithSigs);
+    let binary = '';
+    for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+    const base64 = btoa(binary);
+    const dataUrl = 'data:application/pdf;base64,' + base64;
+
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href     = dataUrl;
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    setTimeout(() => document.body.removeChild(a), 500);
 
     setTimeout(() => resetForNext(), 800);
 });
@@ -1116,6 +1162,7 @@ function resetForNext() {
     });
 
     document.getElementById('status').textContent = '';
+    document.getElementById('pdf-filename-input').value = '';
     document.getElementById('preview-content').classList.remove('visible');
     document.getElementById('preview-empty').style.display = 'block';
 
